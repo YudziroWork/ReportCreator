@@ -3,33 +3,48 @@ from openpyxl.styles import PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 
-def generate_report(results, stats, etalon_list, output_path: str):
+def generate_report(
+    results,
+    stats,
+    etalon_list,
+    output_path: str,
+    show_threshold_matches: bool,
+    make_stat1: bool,
+    make_stat2: bool,
+    make_not_used: bool,
+):
     wb = Workbook()
     ws = wb.active
     ws.title = "Результаты"
 
     # ----------------------------
-    # Заголовки
+    # Заголовки основной таблицы
     # ----------------------------
-    ws["A1"] = "Распознаные номера"
+    ws["A1"] = "Распознанные номера"
     ws["B1"] = "Лучшее совпадение"
     ws["C1"] = "Дистанция"
-    ws["E1"] = "Эталон не участвовал в сравнении"
 
-    ws["G1"] = "Статистика качества детекции"
-    ws["G2"] = "Всего распознано"
-    ws["G3"] = "Полностью распознаные"
-    ws["G4"] = "Частично распознаные"
-    ws["G5"] = "Неверно распознано"
-    ws["G6"] = "Полностью распознаные (%)"
-    ws["G7"] = "Полностью + частично распознаные (%)"
+    if make_not_used:
+        ws["E1"] = "Эталон не участвовал в сравнении"
 
-    ws["H2"] = stats["total"]
-    ws["H3"] = stats["fully_matched"]
-    ws["H4"] = stats["partially_matched"]
-    ws["H5"] = stats["incorrect"]
-    ws["H6"] = round(stats["accuracy_percent"], 2)
-    ws["H7"] = round(stats["full_plus_part"], 2)
+    # ----------------------------
+    # Статистика 1 (G1-H7)
+    # ----------------------------
+    if make_stat1:
+        ws["G1"] = "Статистика качества детекции"
+        ws["G2"] = "Всего распознано"
+        ws["G3"] = "Полностью распознано"
+        ws["G4"] = "Частично распознано"
+        ws["G5"] = "Неверно распознано"
+        ws["G6"] = "Полностью распознано (%)"
+        ws["G7"] = "Полностью + частично (%)"
+
+        ws["H2"] = stats["total"]
+        ws["H3"] = stats["fully_matched"]
+        ws["H4"] = stats["partially_matched"]
+        ws["H5"] = stats["incorrect"]
+        ws["H6"] = round(stats["accuracy_percent"], 2)
+        ws["H7"] = round(stats["full_plus_part"], 2)
 
     # ----------------------------
     # Цвета
@@ -41,22 +56,42 @@ def generate_report(results, stats, etalon_list, output_path: str):
     used_etalon = set()
     row_index = 2
 
+    # ----------------------------
+    # Основная таблица результатов
+    # ----------------------------
     for item in results:
         recognized = ", ".join(item["recognized"])
-        best = ", ".join(item["best_match"]) if item["best_match"] else ""
+        best = ""
         dist = item["distance"]
+        threshold = None
+
+        if item["best_match"]:
+            best_string = "".join(item["best_match"])
+            max_len = len(best_string)
+            threshold = 0.55 * max_len
+
+
+            if dist == 0:
+                best = ", ".join(item["best_match"])
+
+
+            elif dist < threshold:
+                best = ", ".join(item["best_match"])
+
+
+            elif show_threshold_matches:
+                best = ", ".join(item["best_match"])
+
+            used_etalon.add(tuple(item["best_match"]))
 
         ws.cell(row=row_index, column=1, value=recognized)
         ws.cell(row=row_index, column=2, value=best)
         ws.cell(row=row_index, column=3, value=dist)
 
-        if item["best_match"]:
-            used_etalon.add(tuple(item["best_match"]))
-
         # Цветовая маркировка
         if dist == 0:
             fill = green
-        elif dist <= 3:
+        elif threshold is not None and dist < threshold:
             fill = yellow
         else:
             fill = red
@@ -67,35 +102,36 @@ def generate_report(results, stats, etalon_list, output_path: str):
         row_index += 1
 
     # ----------------------------
-    # Эталон не участвовал
+    # Список неиспользованных эталонов (столбец E)
     # ----------------------------
-    not_used_row = 2
+    if make_not_used:
+        not_used_row = 2
+        for row in etalon_list:
+            if tuple(row) not in used_etalon:
+                ws.cell(row=not_used_row, column=5, value=", ".join(row))
+                not_used_row += 1
 
-    for row in etalon_list:
-        if tuple(row) not in used_etalon:
-            ws.cell(row=not_used_row, column=5, value=", ".join(row))
-            not_used_row += 1
+    # ----------------------------
+    # Статистика 2 (G10-H13)
+    # ----------------------------
+    if make_stat2:
+        ws["G10"] = "Статистика детекции"
+        ws["G11"] = "Всего записей в эталоне"
+        ws["G12"] = "Пропущенные номера"
+        ws["G13"] = "Число повторов"
 
-    # =========================
-    # Вторая статистика (с G10)
-    # =========================
-    ws["G10"] = "Статистика детекции"
-    ws["G11"] = "Всего записей в эталоне"
-    ws["G12"] = "Пропущенные номера"
-    ws["G13"] = "Число повторов"
+        ws["H11"] = stats["total_etalon"]
+        ws["H12"] = stats["not_used_count"]
+        ws["H13"] = stats["duplicates_count"]
 
-    ws["H11"] = stats["total_etalon"]
-    ws["H12"] = stats["not_used_count"]
-    ws["H13"] = stats["duplicates_count"]
-
-    # =========================
+    # ----------------------------
     # Форматирование
-    # =========================
+    # ----------------------------
     thin_border = Border(
         left=Side(style="thin"),
         right=Side(style="thin"),
         top=Side(style="thin"),
-        bottom=Side(style="thin")
+        bottom=Side(style="thin"),
     )
 
     alignment = Alignment(horizontal="center", vertical="center")
