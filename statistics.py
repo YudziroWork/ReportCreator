@@ -9,7 +9,7 @@ def calculate_statistics(results, etalon_list, threshold_ratio: float = 0.55):
 
     distances = []
     used_etalon = set()
-    best_matches_list = []
+    best_matches_for_duplicates = []
 
     for item in results:
         dist = item["distance"]
@@ -18,15 +18,23 @@ def calculate_statistics(results, etalon_list, threshold_ratio: float = 0.55):
         distances.append(dist)
 
         if best:
-            used_etalon.add(tuple(best))
-            best_matches_list.append(tuple(best))
+            best_string = "".join(best)
+            max_len = len(best_string)
+            threshold = threshold_ratio * max_len
 
-            max_len = max(len(cell) for cell in best) if best else 1
+            used_etalon.add(tuple(best))
+
 
             if dist == 0:
                 fully += 1
-            elif dist < threshold_ratio * max_len:
+                best_matches_for_duplicates.append(tuple(best))
+
+
+            elif dist < threshold:
                 partial += 1
+                best_matches_for_duplicates.append(tuple(best))
+
+
             else:
                 incorrect += 1
         else:
@@ -34,26 +42,25 @@ def calculate_statistics(results, etalon_list, threshold_ratio: float = 0.55):
 
     avg_distance = sum(distances) / total if total else 0
 
-    # -------- Вторая статистика --------
-    total_etalon = len(etalon_list)
+    # -------- Повторы только зелёные + жёлтые --------
+    counter = Counter(best_matches_for_duplicates)
+    duplicates_count = sum(count - 1 for count in counter.values() if count > 1)
 
+    total_etalon = len(etalon_list)
     not_used_count = sum(
         1 for row in etalon_list if tuple(row) not in used_etalon
     )
 
-    counter = Counter(best_matches_list)
-    duplicates_count = sum(count - 1 for count in counter.values() if count > 1)
-
     return {
-        # Первая статистика
         "total": total,
         "fully_matched": fully,
         "partially_matched": partial,
         "incorrect": incorrect,
         "accuracy_percent": (fully / total * 100) if total else 0,
-        "full_plus_part": (((fully + partial) / total) * 100) if total else 0,
-
-        # Вторая статистика
+        "full_plus_part": ((fully + partial) / total * 100) if total else 0,
+        "avg_distance": avg_distance,
+        "max_distance": max(distances) if distances else 0,
+        "min_distance": min(distances) if distances else 0,
         "total_etalon": total_etalon,
         "not_used_count": not_used_count,
         "duplicates_count": duplicates_count,

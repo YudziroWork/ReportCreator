@@ -2,6 +2,7 @@ from excel_reader import read_excel_as_list
 from comparison import compare_lists
 from statistics import calculate_statistics
 from report import generate_report
+from adv_statistics import calculate_advanced_statistics
 
 
 def process(
@@ -13,6 +14,7 @@ def process(
     make_stat2: bool,
     make_not_used: bool,
 ):
+
     # Читаем файлы
     etalon_list = read_excel_as_list(etalon_path)
     recognized_list = read_excel_as_list(recognized_path)
@@ -23,10 +25,14 @@ def process(
     # Считаем статистику
     stats = calculate_statistics(results, etalon_list)
 
+    #Доп статистика
+    advanced_stats = calculate_advanced_statistics(results)
+
     # Генерируем отчёт
     generate_report(
         results,
         stats,
+        advanced_stats,
         etalon_list,
         output_path,
         show_threshold_matches,

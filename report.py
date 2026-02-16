@@ -6,6 +6,7 @@ from openpyxl.utils import get_column_letter
 def generate_report(
     results,
     stats,
+    advanced_stats,
     etalon_list,
     output_path: str,
     show_threshold_matches: bool,
@@ -158,5 +159,81 @@ def generate_report(
                 max_length = max(max_length, len(str(cell.value)))
 
         ws.column_dimensions[column_letter].width = (max_length + 2) * 1.2
+
+
+
+    # =====================================
+    # ВТОРОЙ ЛИСТ — Продвинутая аналитика
+    # =====================================
+
+    ws2 = wb.create_sheet("Расширенная статистика")
+
+    # -----------------------------
+    # Использование эталонов
+    # -----------------------------
+    ws2["A1"] = "Эталон"
+    ws2["B1"] = "Количество распознаваний"
+
+    row_index = 2
+    for etalon, count in sorted(
+            advanced_stats["etalon_usage"].items(),
+            key=lambda x: x[1],
+            reverse=True
+    ):
+        ws2.cell(row=row_index, column=1, value=etalon)
+        ws2.cell(row=row_index, column=2, value=count)
+        row_index += 1
+
+    # -----------------------------
+    # Ошибки
+    # -----------------------------
+    ws2["D1"] = "Ошибки"
+    ws2["E1"] = "Количество ошибок"
+
+    er_row_index = 2
+
+    for error, count in sorted(
+            advanced_stats["error_stats"].items(),
+            key=lambda x: x[1],
+            reverse=True
+    ):
+        ws2.cell(row=er_row_index, column=4, value=error)
+        ws2.cell(row=er_row_index, column=5, value=count)
+        er_row_index += 1
+
+    # ----------------------------
+    # Форматирование
+    # ----------------------------
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+
+    alignment = Alignment(horizontal="center", vertical="center")
+
+    max_row = ws2.max_row
+    max_col = ws2.max_column
+
+    for row in ws2.iter_rows(min_row=1, max_row=max_row, min_col=1, max_col=max_col):
+        for cell in row:
+            if cell.value is not None:
+                cell.border = thin_border
+                cell.alignment = alignment
+
+    # ----------------------------
+    # Автоширина столбцов
+    # ----------------------------
+    for col in range(1, max_col + 1):
+        column_letter = get_column_letter(col)
+        max_length = 0
+
+        for row in range(1, max_row + 1):
+            cell = ws2.cell(row=row, column=col)
+            if cell.value:
+                 max_length = max(max_length, len(str(cell.value)))
+
+        ws2.column_dimensions[column_letter].width = (max_length + 2) * 1.2
 
     wb.save(output_path)
