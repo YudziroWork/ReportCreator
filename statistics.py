@@ -22,16 +22,18 @@ def calculate_statistics(results, etalon_list, threshold_ratio: float = 0.55):
             max_len = len(best_string)
             threshold = threshold_ratio * max_len
 
-            used_etalon.add(tuple(best))
+            #used_etalon.add(tuple(best))
 
 
             if dist == 0:
                 fully += 1
+                used_etalon.add(tuple(best))
                 best_matches_for_duplicates.append(tuple(best))
 
 
             elif dist < threshold:
                 partial += 1
+                used_etalon.add(tuple(best))
                 best_matches_for_duplicates.append(tuple(best))
 
 
